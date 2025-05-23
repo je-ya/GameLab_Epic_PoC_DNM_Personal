@@ -1,31 +1,10 @@
-﻿using UnityEngine;
-using System.Collections.Generic;
-using System.Linq;
+﻿using System.Collections.Generic;
+using UnityEngine;
 using System;
-using UnityEditor;
-using static Unity.Burst.Intrinsics.X86.Avx;
+using System.Linq;
 
-public class NodeBasedMovement : MonoBehaviour
+public class MonMovemont : MonoBehaviour
 {
-    public class Node
-    {
-        public Vector3 Position;
-        public List<Node> Neighbors;
-        public NodeObject.NodeType Type; // Updated to use NodeType
-        public int Floor;
-        public string Name;
-
-
-        public Node(Vector3 position, int floor, NodeObject.NodeType type, string name = "")
-        {
-            Position = position;
-            Neighbors = new List<Node>();
-            Floor = floor;
-            Type = type;
-            Name = name;
-        }
-    }
-
     public float moveSpeed = 2f;
     public float neighborRadius = 4f;
     public float separationDistance = 0.8f;
@@ -40,103 +19,83 @@ public class NodeBasedMovement : MonoBehaviour
     private Node currentNode;
     private List<Node> currentPath;
     private int pathIndex;
-    private EmployeeState state = EmployeeState.Idle;
+    private MonMovemontState state = MonMovemontState.Idle;
 
     private Node targetNode;
     private float elevatorTransitionTime = 1f;
     private Vector3 velocity;
     private Vector3 targetPosition;
-    private static List<NodeBasedMovement> selectedCharacters;
-    private EmployeeActions employeeActions; // Reference to action component
+    private static List<MonMovemont> selectedCharacters;
+    private MonAction employeeActions; 
     private Action onMovementComplete;
-    public enum EmployeeState { Idle, Moving, InElevator }
+    public enum MonMovemontState { Idle, Moving, InElevator }
 
-    public EmployeeState GetState()
+    public MonMovemontState GetState()
     {
         return state;
     }
 
-    public void SetState(EmployeeState newState)
+    public void SetState(MonMovemontState newState)
     {
         state = newState;
     }
 
     void Start()
     {
-        InitializeMapFromScene();
-        currentNode = nodes.Find(n => n.Name == "Room1_F1") ?? nodes[0];
+        if (MapManager.Instance == null)
+        {
+            Debug.LogError("MapManager instance is null. Ensure MapManager is initialized in the scene.");
+            return;
+        }
+
+        nodes = new List<Node>(MapManager.Instance.AllNodes);
+        floors = new Dictionary<int, List<Node>>(MapManager.Instance.NodesByFloor
+            .ToDictionary(kvp => kvp.Key, kvp => new List<Node>(kvp.Value)));
+
+        currentNode = MapManager.Instance.GetNodeByName("Room1_F1") ?? nodes.FirstOrDefault();
+        if (currentNode == null)
+        {
+            Debug.LogError("No nodes available in the map. Check MapManager initialization.");
+            return;
+        }
         transform.position = currentNode.Position;
         velocity = Vector3.zero;
 
         if (selectedCharacters == null)
         {
-            selectedCharacters = new List<NodeBasedMovement>();
+            selectedCharacters = new List<MonMovemont>();
         }
 
-        // Get or add EmployeeActions component
-        employeeActions = GetComponent<EmployeeActions>();
+        employeeActions = GetComponent<MonAction>();
         if (employeeActions == null)
         {
-            employeeActions = gameObject.AddComponent<EmployeeActions>();
+            employeeActions = gameObject.AddComponent<MonAction>();
         }
     }
 
     void Update()
     {
-        if (state == EmployeeState.Moving)
+        if (state == MonMovemontState.Moving)
         {
             MoveAlongPath();
         }
-        else if (state == EmployeeState.InElevator)
+        else if (state == MonMovemontState.InElevator)
         {
-            // Elevator transition, no changes needed
         }
-        else if (state == EmployeeState.Idle)
+        else if (state == MonMovemontState.Idle)
         {
-            // Let EmployeeActions handle idle state actions
         }
     }
 
-    void InitializeMapFromScene()
+    public void MoveToNode(string targetNodeName, Action onCompleteCallback = null)
     {
-        NodeObject[] nodeObjects = FindObjectsOfType<NodeObject>();
-        Dictionary<NodeObject, Node> nodeObjectToNode = new Dictionary<NodeObject, Node>();
-        //foreach (NodeObject nodeObj in nodeObjects)
-        //{
-        //    Node node = nodeObj.GetNode();
-        //    nodes.Add(node);
-        //    nodeObjectToNode[nodeObj] = node;
-        //    if (!floors.ContainsKey(node.Floor))
-        //    {
-        //        floors[node.Floor] = new List<Node>();
-        //    }
-        //    floors[node.Floor].Add(node);
-        //}
+        employeeActions.CancelAction(); 
 
-        foreach (NodeObject nodeObj in nodeObjects)
-        {
-            Node node = nodeObjectToNode[nodeObj];
-            foreach (NodeObject neighborObj in nodeObj.Neighbors)
-            {
-                if (nodeObjectToNode.ContainsKey(neighborObj))
-                {
-                    node.Neighbors.Add(nodeObjectToNode[neighborObj]);
-                }
-            }
-        }
-
-        Debug.Log($"Initialized {nodes.Count} nodes across {floors.Count} floors.");
-    }
-
-    public void MoveToNode(string targetNodeName, Action onCompleteCallback = null) // 콜백 파라미터 추가
-    {
-        employeeActions.CancelAction(); // 이동 시작 전 현재 액션 취소
-
-        targetNode = nodes.Find(n => n.Name == targetNodeName);
+        targetNode = MapManager.Instance.GetNodeByName(targetNodeName);
         if (targetNode == null)
         {
             Debug.LogError("Target node not found: " + targetNodeName);
-            onCompleteCallback?.Invoke(); // 타겟 노드가 없으면 즉시 콜백 호출 (실패 처리)
+            onCompleteCallback?.Invoke();
             return;
         }
 
@@ -144,17 +103,17 @@ public class NodeBasedMovement : MonoBehaviour
         if (currentPath != null && currentPath.Count > 0)
         {
             pathIndex = 0;
-            state = EmployeeState.Moving;
-            this.onMovementComplete = onCompleteCallback; // 콜백 저장
+            state = MonMovemontState.Moving;
+            this.onMovementComplete = onCompleteCallback;
             SetRandomTargetPosition();
             Debug.Log($"{gameObject.name} starting move to {targetNodeName}. Callback set: {onMovementComplete != null}");
         }
         else
         {
             Debug.LogWarning($"{gameObject.name} could not find path to {targetNodeName}.");
-            this.onMovementComplete = null; // 경로 없으면 콜백도 없음
-            onCompleteCallback?.Invoke(); // 경로가 없으면 즉시 콜백 호출 (실패 처리)
-            state = EmployeeState.Idle; // 경로 없으면 Idle 상태로
+            this.onMovementComplete = null;
+            onCompleteCallback?.Invoke();
+            state = MonMovemontState.Idle;
         }
     }
 
@@ -173,18 +132,6 @@ public class NodeBasedMovement : MonoBehaviour
         {
             selectedCharacters.Remove(this);
         }
-    }
-
-    // Expose method to set state to Idle (used by EmployeeActions)
-    public void SetIdle()
-    {
-        state = EmployeeState.Idle;
-    }
-
-    // Expose current node for EmployeeActions to check node type
-    public Node GetCurrentNode()
-    {
-        return currentNode;
     }
 
     List<Node> FindPath(Node start, Node goal)
@@ -232,29 +179,27 @@ public class NodeBasedMovement : MonoBehaviour
 
     void MoveAlongPath()
     {
-        if (state != EmployeeState.Moving || currentPath == null || pathIndex >= currentPath.Count)
+        if (state != MonMovemontState.Moving || currentPath == null || pathIndex >= currentPath.Count)
         {
-            // 이동이 완료되었거나, 경로가 없거나, 이미 끝에 도달한 경우
-            if (state == EmployeeState.Moving) // 정상적으로 경로 끝에 도달한 경우
+            if (state == MonMovemontState.Moving)
             {
-                state = EmployeeState.Idle;
-                currentNode = targetNode; // 실제 목표 노드로 현재 노드 업데이트
+                state = MonMovemontState.Idle;
+                currentNode = targetNode;
                 velocity = Vector3.zero;
-                Debug.Log($"{gameObject.name} reached destination {currentNode?.Name}. Invoking callback.");
-                onMovementComplete?.Invoke(); // 저장된 콜백 호출
-                onMovementComplete = null;    // 콜백 사용 후 초기화
+                Debug.Log($"{gameObject.name} reached destination {currentNode?.NodeName}. Invoking callback.");
+                onMovementComplete?.Invoke();
+                onMovementComplete = null;
             }
             return;
         }
 
-        Node nextNodeInPath = currentPath[pathIndex]; // nextNode 변수명 변경 (targetNode와 혼동 방지)
+        Node nextNodeInPath = currentPath[pathIndex];
         if (nextNodeInPath.Type == NodeObject.NodeType.Elevator && currentNode.Floor != nextNodeInPath.Floor)
         {
             StartElevatorTransition(nextNodeInPath);
             return;
         }
 
-        // ... (기존 이동 로직: CalculateFlockVelocity, velocity 계산, transform.position 업데이트)
         Vector3 flockVelocity = CalculateFlockVelocity();
         Vector3 nodeDirection = (targetPosition - transform.position).normalized;
         Vector3 targetVelocity = (nodeWeight * nodeDirection + flockVelocity).normalized * moveSpeed;
@@ -262,27 +207,23 @@ public class NodeBasedMovement : MonoBehaviour
         velocity = Vector3.Lerp(velocity, targetVelocity, smoothingFactor);
         transform.position += velocity * Time.deltaTime;
 
-
-        Vector3 toTargetPos = targetPosition - transform.position; // targetPosition은 SetRandomTargetPosition에서 설정된 노드 내 랜덤 위치
-        // 현재 경로의 다음 노드(nextNodeInPath)에 충분히 가까워졌는지 확인하는 것이 아니라,
-        // 노드 내의 랜덤 목표 지점(targetPosition)에 도달했는지 확인
-        if (Vector3.Distance(transform.position, targetPosition) < 0.1f) // 도달 판정 거리 (조절 가능)
+        Vector3 toTargetPos = targetPosition - transform.position;
+        if (Vector3.Distance(transform.position, targetPosition) < 0.1f)
         {
-            transform.position = new Vector3(targetPosition.x, targetPosition.y, targetPosition.z); // 정확한 위치로 보정
-            currentNode = nextNodeInPath; // 현재 노드를 경로상의 다음 노드로 업데이트
+            transform.position = new Vector3(targetPosition.x, targetPosition.y, targetPosition.z);
+            currentNode = nextNodeInPath;
             pathIndex++;
 
-            if (pathIndex >= currentPath.Count) // 경로의 끝에 도달했다면
+            if (pathIndex >= currentPath.Count)
             {
-                state = EmployeeState.Idle; // Idle 상태로 변경
-                // currentNode는 이미 마지막 노드로 설정됨
-                Debug.Log($"{gameObject.name} reached FINAL destination {currentNode?.Name}. Invoking callback.");
-                onMovementComplete?.Invoke(); // 콜백 호출
-                onMovementComplete = null;    // 콜백 초기화
+                state = MonMovemontState.Idle;
+                Debug.Log($"{gameObject.name} reached FINAL destination {currentNode?.NodeName}. Invoking callback.");
+                onMovementComplete?.Invoke();
+                onMovementComplete = null;
             }
-            else // 아직 경로가 남았다면
+            else
             {
-                SetRandomTargetPosition(); // 다음 경로의 노드 내 랜덤 위치 설정
+                SetRandomTargetPosition();
             }
         }
     }
@@ -297,7 +238,6 @@ public class NodeBasedMovement : MonoBehaviour
 
     void OnDestroy()
     {
-        // Remove this instance from selectedCharacters when destroyed
         if (selectedCharacters != null && selectedCharacters.Contains(this))
         {
             selectedCharacters.Remove(this);
@@ -315,9 +255,9 @@ public class NodeBasedMovement : MonoBehaviour
         Vector3 toTarget = targetPosition - transform.position;
         float flockWeight = Mathf.Clamp01((Mathf.Max(Mathf.Abs(toTarget.x), Mathf.Abs(toTarget.z)) / targetRadius));
 
-        foreach (NodeBasedMovement other in selectedCharacters)
+        foreach (MonMovemont other in selectedCharacters)
         {
-            if (other == this || other.state != EmployeeState.Moving || other.currentNode.Floor != currentNode.Floor)
+            if (other == this || other.state != MonMovemontState.Moving || other.currentNode.Floor != currentNode.Floor)
                 continue;
 
             float distance = Vector3.Distance(transform.position, other.transform.position);
@@ -346,7 +286,7 @@ public class NodeBasedMovement : MonoBehaviour
 
     void StartElevatorTransition(Node elevatorNode)
     {
-        state = EmployeeState.InElevator;
+        state = MonMovemontState.InElevator;
         velocity = Vector3.zero;
         StartCoroutine(ElevatorTransition(elevatorNode));
     }
@@ -362,9 +302,7 @@ public class NodeBasedMovement : MonoBehaviour
         {
             SetRandomTargetPosition();
         }
-        state = EmployeeState.Moving;
+        state = MonMovemontState.Moving;
         Debug.Log("Arrived at floor " + targetElevator.Floor);
     }
-
-
 }

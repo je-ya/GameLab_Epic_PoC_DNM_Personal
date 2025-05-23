@@ -163,7 +163,7 @@ public class Enemy : MonoBehaviour
 
     private void Attack(GameObject target)
     {
-        EmployeeActions player = target.GetComponent<EmployeeActions>();
+        MonAction player = target.GetComponent<MonAction>();
         if (player != null)
         {
             player.TakeDamage(attackPower);

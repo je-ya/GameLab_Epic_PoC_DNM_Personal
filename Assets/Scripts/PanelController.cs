@@ -2,7 +2,6 @@
 using UnityEngine.UI;
 using System.Collections.Generic;
 using System.Linq;
-using static NodeBasedMovement;
 
 public class ActionPanelController : MonoBehaviour
 {
@@ -19,8 +18,7 @@ public class ActionPanelController : MonoBehaviour
 
     private List<GameObject> currentSelectedUnits;
     private Vector3 clickWorldPosition;
-    private NodeBasedMovement.Node clickTargetNode;
-    private NodeBasedMovement nodeSystem;
+
     private DragSelection dragSelection;
 
     void Awake()
@@ -38,166 +36,144 @@ public class ActionPanelController : MonoBehaviour
         actionPanelObject.SetActive(false);
     }
 
-    void Start()
-    {
-        nodeSystem = FindAnyObjectByType<NodeBasedMovement>();
-        dragSelection = gameObject.GetComponent<DragSelection>();
-        if (nodeSystem == null)
-        {
-            Debug.LogError("ActionPanelController: NodeBasedMovement system not found in scene!");
-        }
+    //void Start()
+    //{
+        
+    //    dragSelection = gameObject.GetComponent<DragSelection>();
 
-        // Button listeners
-        moveButton.onClick.AddListener(OnMoveClicked);
-        attackButton.onClick.AddListener(OnAttackClicked);
-        workButton.onClick.AddListener(OnWorkClicked);
-        stealthButton.onClick.AddListener(OnStealthClicked);
-    }
+    //    // Button listeners
+    //    moveButton.onClick.AddListener(OnMoveClicked);
+    //    attackButton.onClick.AddListener(OnAttackClicked);
+    //    workButton.onClick.AddListener(OnWorkClicked);
+    //    stealthButton.onClick.AddListener(OnStealthClicked);
+    //}
 
-    public void ShowPanel(List<GameObject> selectedUnits, Vector3 worldPosition)
-    {
-        if (selectedUnits == null || selectedUnits.Count == 0)
-        {
-            Debug.LogWarning("ActionPanelController: ShowPanel called with no selected units.");
-            return;
-        }
+    //public void ShowPanel(List<GameObject> selectedUnits, Vector3 worldPosition)
+    //{
+    //    if (selectedUnits == null || selectedUnits.Count == 0)
+    //    {
+    //        Debug.LogWarning("ActionPanelController: ShowPanel called with no selected units.");
+    //        return;
+    //    }
 
-        currentSelectedUnits = selectedUnits;
-        clickWorldPosition = worldPosition;
-        clickTargetNode = FindClosestNodeToPosition(clickWorldPosition);
+    //    currentSelectedUnits = selectedUnits;
+    //    clickWorldPosition = worldPosition;
+    //    clickTargetNode = FindClosestNodeToPosition(clickWorldPosition);
 
-        actionPanelObject.transform.position = Input.mousePosition;
+    //    actionPanelObject.transform.position = Input.mousePosition;
 
-        bool canStealth = selectedUnits.Any(u => u.GetComponent<EmployeeActions>()?.monData.monType == MonType.Outlook);
-        attackButton.gameObject.SetActive(true);
-        workButton.gameObject.SetActive(true);
-        stealthButton.gameObject.SetActive(canStealth);
+    //    bool canStealth = selectedUnits.Any(u => u.GetComponent<EmployeeActions>()?.monData.monType == MonType.Outlook);
+    //    attackButton.gameObject.SetActive(true);
+    //    workButton.gameObject.SetActive(true);
+    //    stealthButton.gameObject.SetActive(canStealth);
 
-        actionPanelObject.SetActive(true);
-    }
+    //    actionPanelObject.SetActive(true);
+    //}
 
-    public void HidePanel()
-    {
-        actionPanelObject.SetActive(false);
-        currentSelectedUnits = null;
-        dragSelection.ClearObjList();
-    }
+    //public void HidePanel()
+    //{
+    //    actionPanelObject.SetActive(false);
+    //    currentSelectedUnits = null;
+    //    dragSelection.ClearObjList();
+    //}
 
-    void OnMoveClicked()
-    {
-        if (clickTargetNode == null)
-        {
-            Debug.LogWarning("No target node selected for movement.");
-            HidePanel();
-            return;
-        }
+    //void OnMoveClicked()
+    //{
+    //    if (clickTargetNode == null)
+    //    {
+    //        Debug.LogWarning("No target node selected for movement.");
+    //        HidePanel();
+    //        return;
+    //    }
 
-        Debug.Log($"Action Panel: Issuing Move command to node {clickTargetNode.Name}");
-        foreach (GameObject unit in currentSelectedUnits)
-        {
-            NodeBasedMovement movement = unit.GetComponent<NodeBasedMovement>();
-            EmployeeActions actions = unit.GetComponent<EmployeeActions>();
-            if (movement != null && actions != null)
-            {
-                actions.CancelAction(); // Clear any existing actions
-                movement.MoveToNode(clickTargetNode.Name); // Move without setting action
-            }
-        }
-        HidePanel();
-    }
+    //    Debug.Log($"Action Panel: Issuing Move command to node {clickTargetNode.Name}");
+    //    foreach (GameObject unit in currentSelectedUnits)
+    //    {
+    //        MonMovemont movement = unit.GetComponent<MonMovemont>();
+    //        EmployeeActions actions = unit.GetComponent<EmployeeActions>();
+    //        if (movement != null && actions != null)
+    //        {
+    //            actions.CancelAction(); // Clear any existing actions
+    //            movement.MoveToNode(clickTargetNode.Name); // Move without setting action
+    //        }
+    //    }
+    //    HidePanel();
+    //}
 
-    void OnAttackClicked()
-    {
-        if (clickTargetNode == null)
-        {
-            Debug.LogWarning("No target node selected for attack.");
-            HidePanel();
-            return;
-        }
+    //void OnAttackClicked()
+    //{
+    //    if (clickTargetNode == null)
+    //    {
+    //        Debug.LogWarning("No target node selected for attack.");
+    //        HidePanel();
+    //        return;
+    //    }
 
-        Debug.Log("Action Panel: Issuing Attack command.");
-        foreach (GameObject unit in currentSelectedUnits)
-        {
-            NodeBasedMovement movement = unit.GetComponent<NodeBasedMovement>();
-            EmployeeActions actions = unit.GetComponent<EmployeeActions>();
-            if (movement != null && actions != null)
-            {
-                actions.CancelAction();
-                movement.MoveToNode(clickTargetNode.Name, () => actions.SetPendingAction(EmployeeActions.ActionState.Attacking));
-            }
-        }
-        HidePanel();
-    }
+    //    Debug.Log("Action Panel: Issuing Attack command.");
+    //    foreach (GameObject unit in currentSelectedUnits)
+    //    {
+    //        MonMovemont movement = unit.GetComponent<MonMovemont>();
+    //        EmployeeActions actions = unit.GetComponent<EmployeeActions>();
+    //        if (movement != null && actions != null)
+    //        {
+    //            actions.CancelAction();
+    //            movement.MoveToNode(clickTargetNode.Name, () => actions.SetPendingAction(EmployeeActions.ActionState.Attacking));
+    //        }
+    //    }
+    //    HidePanel();
+    //}
 
-    void OnWorkClicked()
-    {
-        if (clickTargetNode == null)
-        {
-            Debug.LogWarning("No target node selected for work.");
-            HidePanel();
-            return;
-        }
+    //void OnWorkClicked()
+    //{
+    //    if (clickTargetNode == null)
+    //    {
+    //        Debug.LogWarning("No target node selected for work.");
+    //        HidePanel();
+    //        return;
+    //    }
 
-        Generator targetGenerator = FindGeneratorAtNode(clickTargetNode);
-        if (targetGenerator == null)
-        {
-            Debug.LogWarning("No generator found at target node for work.");
-            HidePanel();
-            return;
-        }
+    //    Generator targetGenerator = FindGeneratorAtNode(clickTargetNode);
+    //    if (targetGenerator == null)
+    //    {
+    //        Debug.LogWarning("No generator found at target node for work.");
+    //        HidePanel();
+    //        return;
+    //    }
 
-        Debug.Log("Action Panel: Issuing Work command.");
-        foreach (GameObject unit in currentSelectedUnits)
-        {
-            NodeBasedMovement movement = unit.GetComponent<NodeBasedMovement>();
-            EmployeeActions actions = unit.GetComponent<EmployeeActions>();
-            if (movement != null && actions != null)
-            {
-                actions.CancelAction();
-                actions.SetTargetGenerator(targetGenerator);
-                movement.MoveToNode(clickTargetNode.Name, () => actions.SetPendingAction(EmployeeActions.ActionState.Working));
-            }
-        }
-        HidePanel();
-    }
+    //    Debug.Log("Action Panel: Issuing Work command.");
+    //    foreach (GameObject unit in currentSelectedUnits)
+    //    {
+    //        MonMovemont movement = unit.GetComponent<MonMovemont>();
+    //        EmployeeActions actions = unit.GetComponent<EmployeeActions>();
+    //        if (movement != null && actions != null)
+    //        {
+    //            actions.CancelAction();
+    //            actions.SetTargetGenerator(targetGenerator);
+    //            movement.MoveToNode(clickTargetNode.Name, () => actions.SetPendingAction(EmployeeActions.ActionState.Working));
+    //        }
+    //    }
+    //    HidePanel();
+    //}
 
-    void OnStealthClicked()
-    {
-        Debug.Log("Action Panel: Issuing Stealth command.");
-        foreach (GameObject unit in currentSelectedUnits)
-        {
-            EmployeeActions actions = unit.GetComponent<EmployeeActions>();
-            if (actions != null && actions.monData.monType == MonType.Outlook)
-            {
-                actions.CancelAction();
-                actions.SetPendingAction(EmployeeActions.ActionState.Stealth);
-            }
-        }
-        HidePanel();
-    }
+    //void OnStealthClicked()
+    //{
+    //    Debug.Log("Action Panel: Issuing Stealth command.");
+    //    foreach (GameObject unit in currentSelectedUnits)
+    //    {
+    //        EmployeeActions actions = unit.GetComponent<EmployeeActions>();
+    //        if (actions != null && actions.monData.monType == MonType.Outlook)
+    //        {
+    //            actions.CancelAction();
+    //            actions.SetPendingAction(EmployeeActions.ActionState.Stealth);
+    //        }
+    //    }
+    //    HidePanel();
+    //}
 
-    // --- Helper Functions ---
 
-    private NodeBasedMovement.Node FindClosestNodeToPosition(Vector3 worldPos)
-    {
-        if (nodeSystem == null) return null;
 
-        NodeBasedMovement.Node closestNode = null;
-        float minDistance = float.MaxValue;
 
-        foreach (var node in nodeSystem.GetNodes())
-        {
-            float distance = Vector3.Distance(worldPos, node.Position);
-            if (distance < minDistance)
-            {
-                minDistance = distance;
-                closestNode = node;
-            }
-        }
-        return closestNode;
-    }
-
-    private Generator FindGeneratorAtNode(NodeBasedMovement.Node node)
+    private Generator FindGeneratorAtNode(Node node)
     {
         if (node == null) return null;
 
@@ -219,7 +195,7 @@ public class ActionPanelController : MonoBehaviour
             if (UnityEngine.EventSystems.EventSystem.current != null &&
                 !UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject())
             {
-                // HidePanel(); // Optional: Uncomment to close panel on non-UI click
+                //HidePanel(); // Optional: Uncomment to close panel on non-UI click
             }
         }
     }

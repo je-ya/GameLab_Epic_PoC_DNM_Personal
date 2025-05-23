@@ -11,8 +11,8 @@ GameObject:
   - component: {fileID: 6314820694001436780}
   - component: {fileID: 5600424259846245351}
   - component: {fileID: 7314652755680561049}
-  - component: {fileID: 4412722936028611282}
   - component: {fileID: 372272974707805119}
+  - component: {fileID: 361803837749098113}
   m_Layer: 0
   m_Name: Mon
   m_TagString: PlayerMon
@@ -111,7 +111,21 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 1, y: 1, z: 0.2}
   m_Center: {x: 0, y: 0, z: 0}
---- !u!114 &4412722936028611282
+--- !u!114 &372272974707805119
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2475332208412834072}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 36d1eadef4235d244921ea7ea81e97c6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  _monData: {fileID: 11400000, guid: 5467a35b0ef13ef449d71beb61ff1ef1, type: 2}
+  targetGenerator: {fileID: 0}
+--- !u!114 &361803837749098113
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -124,25 +138,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   moveSpeed: 11
-  neighborRadius: 5
-  separationDistance: 1
-  cohesionWeight: 1
-  separationWeight: 1.5
+  neighborRadius: 4
+  separationDistance: 0.8
+  cohesionWeight: 0.8
+  separationWeight: 2
   alignmentWeight: 1
-  nodeWeight: 2
+  nodeWeight: 3
   smoothingFactor: 0.1
-  targetRadius: 3
---- !u!114 &372272974707805119
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2475332208412834072}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 36d1eadef4235d244921ea7ea81e97c6, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  _monData: {fileID: 11400000, guid: 5467a35b0ef13ef449d71beb61ff1ef1, type: 2}
-  targetGenerator: {fileID: 0}
+  targetRadius: 1.5
