@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f01094ec6a20b524881787abba9f97c6, type: 3}
+  m_Name: NewMonData 2
+  m_EditorClassIdentifier: 
+  monName: 
+  monType: 3
+  maxHp: 20
+  attackPower: 1
+  attackRange: 1
+  attackCooldown: 1
+  workEfficiency: 0.1
+  specialAbilityType: 
+  abilityValue: 0
