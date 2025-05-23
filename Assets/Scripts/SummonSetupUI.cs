@@ -1,6 +1,6 @@
 ﻿using UnityEngine;
-using UnityEngine.UI; // Button은 여전히 UnityEngine.UI를 사용합니다.
-using TMPro; // TextMeshPro 네임스페이스 추가
+using UnityEngine.UI; 
+using TMPro; 
 
 public class SummonSetupUI : MonoBehaviour
 {
@@ -79,20 +79,7 @@ public class SummonSetupUI : MonoBehaviour
             // if (currentTotal >= maxTotalSummonsAllowed) return;
         }
 
-        // 감소 시키려고 하는데, 감소 시키려는 유닛의 수가 0이고, 총합이 최대치를 넘은 상태라면 감소 허용
-        // 이 로직은 현재 총합이 최대치를 넘었을 때, + 버튼으로 더 늘리는 것을 막지는 않습니다.
-        // (아래 totalSummons > maxTotalSummonsAllowed 에서 Start 버튼을 비활성화하므로 괜찮을 수 있음)
-        // 만약 + 버튼을 눌렀을 때, 총합이 최대치를 '넘게 되면' 증가 자체를 막고 싶다면,
-        // 이 함수 초입에 '증가 후의 예상 총합'을 계산해서 체크해야 합니다.
-        /*
-        if (amount > 0) { // 증가시키려고 할 때
-            if (currentTotal + amount > maxTotalSummonsAllowed && countVariable + amount > countVariable) {
-                 // 이미 현재 개별 유닛수가 최대가 아니어도, 총합이 넘게 되면 증가하지 않도록 함
-                 // (이 로직은 개별 유닛 증가 시 총합 한도를 넘지 않도록 더 타이트하게 관리)
-                 // 이 부분은 필요에 따라 조절
-            }
-        }
-        */
+
 
 
         int newCount = countVariable + amount;
