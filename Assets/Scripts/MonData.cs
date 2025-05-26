@@ -10,6 +10,7 @@ public class MonData : ScriptableObject
     public float attackRange; // 공격 범위
     public float attackCooldown; // 공격 반복 주기
     public float workEfficiency; // 작업 효율
+    public float workInterval; // 작업 반복 주기
     public string specialAbilityType; // 특수 능력 타입 (비어 있거나 "None"이면 특수 능력 없음)
     public float abilityValue; // 특수 능력 값 (특수 능력 없을 때는 무시)
 }

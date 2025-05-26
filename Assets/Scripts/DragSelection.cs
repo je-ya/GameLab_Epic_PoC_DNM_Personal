@@ -1,9 +1,9 @@
 ﻿using UnityEngine;
 using System.Collections.Generic;
 using UnityEngine.EventSystems;
-using System.Linq;
 
-public class DragSelection : MonoBehaviour 
+
+public class DragSelection : MonoBehaviour
 {
     private Vector2 startPos;
     private Vector2 currentPos;
@@ -16,12 +16,12 @@ public class DragSelection : MonoBehaviour
     {
         if (Input.GetMouseButtonDown(0))
         {
-            
+
             if (ActionPanelController.Instance != null && ActionPanelController.Instance.actionPanelObject.activeSelf &&
                 UnityEngine.EventSystems.EventSystem.current != null &&
                 UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject())
             {
-                return; 
+                return;
             }
 
 
@@ -33,15 +33,15 @@ public class DragSelection : MonoBehaviour
                 MonMovemont movement = obj.GetComponent<MonMovemont>();
                 if (movement != null)
                 {
-                    movement.SetSelected(false); 
+                    movement.SetSelected(false);
                 }
             }
-            selectedObjects.Clear(); 
+            selectedObjects.Clear();
         }
 
         if (Input.GetMouseButtonUp(0))
         {
-            if (isDragging) 
+            if (isDragging)
             {
                 isDragging = false;
                 SelectObjectsInRect();
@@ -62,48 +62,15 @@ public class DragSelection : MonoBehaviour
                 return;
             }
 
-            // 트리거 콜라이더도 감지하도록 설정
-            Physics.queriesHitTriggers = true;
-
-            // "Node" 레이어만 타겟팅
-            LayerMask nodeLayer = LayerMask.GetMask("Node");
-            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
-            RaycastHit[] hits = Physics.RaycastAll(ray, Mathf.Infinity, nodeLayer);
-            foreach (RaycastHit hit in hits)
+            // 선택된 유닛이 없으면 패널을 띄우지 않음
+            if (selectedObjects.Count == 0)
             {
-                NodeObject nodeObject = hit.collider.GetComponent<NodeObject>();
-                if (nodeObject != null)
-                {
-                    string targetNodeName = nodeObject.NodeName;
-                    Debug.Log($"Right-clicked on Node: {targetNodeName}");
-
-                    // 선택된 모든 오브젝트에 대해 MoveToNode 호출
-                    foreach (GameObject obj in selectedObjects)
-                    {
-                        MonMovemont movement = obj.GetComponent<MonMovemont>();
-                        if (movement != null)
-                        {
-                            movement.MoveToNode(targetNodeName, () =>
-                            {
-                                Debug.Log($"{obj.name} arrived at {targetNodeName}");
-                            });
-                        }
-                    }
-                    break; // 첫 번째 NodeObject를 찾으면 종료
-                }
+                Debug.Log("No units selected to show action panel.");
+                return;
             }
 
-            if (hits.Length == 0)
-            {
-                Debug.Log("No collider hit in 'Node' layer by right-click.");
-            }
-            else if (hits.All(hit => hit.collider.GetComponent<NodeObject>() == null))
-            {
-                Debug.Log("No NodeObject found in 'Node' layer at clicked position.");
-            }
-
-            // 트리거 감지 설정 원복 (선택 사항)
-            Physics.queriesHitTriggers = false;
+            Vector3 worldPos = Camera.main.ScreenToWorldPoint(new Vector3(Input.mousePosition.x, Input.mousePosition.y, Camera.main.nearClipPlane));
+            ActionPanelController.Instance.ShowPanel(selectedObjects, worldPos);
         }
     }
 
@@ -111,10 +78,10 @@ public class DragSelection : MonoBehaviour
     {
         if (isDragging)
         {
-            GUI.color = new Color(0.5f, 0.5f, 1f, 0.3f); 
+            GUI.color = new Color(0.5f, 0.5f, 1f, 0.3f);
             GUI.DrawTexture(selectionRect, Texture2D.whiteTexture);
-            GUI.color = Color.white; 
-            GUI.Box(selectionRect, ""); 
+            GUI.color = Color.white;
+            GUI.Box(selectionRect, "");
         }
     }
 
@@ -131,14 +98,27 @@ public class DragSelection : MonoBehaviour
 
     private void SelectObjectsInRect()
     {
+        // 검색할 태그 배열
+        string[] targetTags = { "PlayerMon", "Stealth" };
+        List<GameObject> allSelectables = new List<GameObject>();
 
-
-        GameObject[] allSelectables = GameObject.FindGameObjectsWithTag("PlayerMon");
-        if (allSelectables.Length == 0)
+        // 각 태그에 대해 오브젝트 수집
+        foreach (string tag in targetTags)
         {
-            Debug.LogWarning("No objects with tag 'PlayerMon' found to select.");
+            GameObject[] objectsWithTag = GameObject.FindGameObjectsWithTag(tag);
+            if (objectsWithTag.Length == 0)
+            {
+                Debug.LogWarning($"No objects with tag '{tag}' found to select.");
+            }
+            allSelectables.AddRange(objectsWithTag);
         }
 
+        // 선택된 오브젝트가 없으면 종료
+        if (allSelectables.Count == 0)
+        {
+            Debug.LogWarning("No objects with target tags found to select.");
+            return;
+        }
 
         foreach (GameObject obj in allSelectables)
         {
@@ -150,7 +130,7 @@ public class DragSelection : MonoBehaviour
                 MonMovemont movement = obj.GetComponent<MonMovemont>();
                 if (movement != null)
                 {
-                    movement.SetSelected(true); 
+                    movement.SetSelected(true);
                 }
                 Debug.Log(obj.name + " selected");
             }
@@ -165,5 +145,14 @@ public class DragSelection : MonoBehaviour
     public void ClearObjList()
     {
         selectedObjects.Clear();
+    }
+
+    public void RemoveFromSelection(GameObject obj)
+    {
+        if (selectedObjects.Contains(obj))
+        {
+            selectedObjects.Remove(obj);
+            Debug.Log($"{obj.name} removed from selectedObjects. Current count: {selectedObjects.Count}");
+        }
     }
 }

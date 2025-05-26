@@ -1,6 +1,6 @@
 ﻿using UnityEngine;
 using System.Collections.Generic;
-using System.Linq; // LINQ 사용을 위해 추가
+using System.Linq;
 
 public class MapManager : MonoBehaviour
 {
@@ -10,14 +10,40 @@ public class MapManager : MonoBehaviour
     private List<Node> allNodes = new List<Node>();
     // 층별로 노드를 그룹화하여 저장하는 딕셔너리
     private Dictionary<int, List<Node>> nodesByFloor = new Dictionary<int, List<Node>>();
+    // Generator 리스트
+    private List<Generator> mapGenerators = new List<Generator>();
+    // Generator가 있는 Node 매핑
+    private Dictionary<Node, Generator> nodeToGeneratorMap = new Dictionary<Node, Generator>();
+
 
     // 외부에서 모든 노드에 접근할 수 있도록 프로퍼티 제공 (읽기 전용)
     public IReadOnlyList<Node> AllNodes => allNodes.AsReadOnly();
     // 외부에서 층별 노드에 접근할 수 있도록 프로퍼티 제공 (읽기 전용)
     public IReadOnlyDictionary<int, IReadOnlyList<Node>> NodesByFloor =>
         nodesByFloor.ToDictionary(kvp => kvp.Key, kvp => (IReadOnlyList<Node>)kvp.Value.AsReadOnly());
+    // Generator 리스트에 접근할 수 있는 프로퍼티
+    public IReadOnlyList<Generator> MapGenerators => mapGenerators.AsReadOnly();
+    // Node에서 Generator를 찾을 수 있는 메서드
+    public Generator GetGeneratorAtNode(Node node)
+    {
+        nodeToGeneratorMap.TryGetValue(node, out Generator generator);
+        return generator;
+    }
+    // Generator가 위치한 Node를 찾는 메서드
+    public Node GetNodeForGenerator(Generator generator)
+    {
+        return nodeToGeneratorMap.FirstOrDefault(kvp => kvp.Value == generator).Key;
+    }
+    // Generator가 있는 Node 리스트 반환
+    public IReadOnlyList<Node> GetNodesWithGenerators()
+    {
+        return nodeToGeneratorMap.Keys.ToList().AsReadOnly();
+    }
+
 
     private Node currentNode;
+
+
 
 
     private void Awake()
@@ -25,7 +51,6 @@ public class MapManager : MonoBehaviour
         if (Instance == null)
         {
             Instance = this;
-            // DontDestroyOnLoad(gameObject); // 씬 전환 시에도 유지하고 싶다면 주석 해제
             InitializeMapFromScene();
         }
         else
@@ -39,12 +64,13 @@ public class MapManager : MonoBehaviour
     {
         allNodes.Clear();
         nodesByFloor.Clear();
+        mapGenerators.Clear();
+        nodeToGeneratorMap.Clear(); 
 
         NodeObject[] nodeObjects = FindObjectsByType<NodeObject>(FindObjectsSortMode.None);
         if (nodeObjects.Length == 0)
         {
             Debug.LogWarning("MapManager: 씬에서 NodeObject를 찾을 수 없습니다.");
-            return;
         }
 
         Dictionary<NodeObject, Node> nodeObjectToNodeMap = new Dictionary<NodeObject, Node>();
@@ -94,6 +120,18 @@ public class MapManager : MonoBehaviour
             }
         }
 
+        Generator[] preExistingGenerators = FindObjectsByType<Generator>(FindObjectsSortMode.None);
+        foreach (Generator gen in preExistingGenerators)
+        {
+            if (!mapGenerators.Contains(gen))
+            {
+                mapGenerators.Add(gen);
+                Debug.Log($"MapManager: Pre-existing generator '{gen.name}' registered, but Node mapping is unknown.");
+            }
+        }
+
+
+
         Debug.Log($"MapManager: {allNodes.Count}개의 노드를 초기화했고, {nodesByFloor.Count}개의 층으로 구성되었습니다.");
     }
 
@@ -121,8 +159,65 @@ public class MapManager : MonoBehaviour
         return new List<Node>().AsReadOnly();
     }
 
+    /// <summary>
+    /// SpawnRoom 타입의 노드를 찾아 그 Node를 반환
+    /// </summary>
+    /// <returns>SpawnRoom 노드가 없으면 null를 반환합니다.</returns>
+    public Node GetSpawnRoom()
+    {
+        Node spawnNode = allNodes.FirstOrDefault(node => node.Type == NodeObject.NodeType.SpawnRoom);
+        if (spawnNode != null)
+        {
+            return spawnNode;
+        }
+        Debug.LogWarning("MapManager: SpawnRoom 노드를 찾을 수 없습니다. 기본 위치(Vector3.zero)를 반환합니다.");
+        return null;
+    }
+
+
     public Node GetCurrentNode()
     {
         return currentNode;
     }
+
+    public void RegisterGenerator(Generator newGenerator, Node node)
+    {
+        if (newGenerator == null)
+        {
+            Debug.LogWarning("MapManager: Attempted to register a null Generator.");
+            return;
+        }
+
+        if (!mapGenerators.Contains(newGenerator))
+        {
+            mapGenerators.Add(newGenerator);
+            if (node != null && allNodes.Contains(node))
+            {
+                nodeToGeneratorMap[node] = newGenerator;
+                Debug.Log($"MapManager: Generator '{newGenerator.name}' registered at Node '{node.NodeName}'. Total generators: {mapGenerators.Count}");
+            }
+            else
+            {
+                Debug.LogWarning($"MapManager: Node for Generator '{newGenerator.name}' is invalid or not found in allNodes.");
+            }
+        }
+        else
+        {
+            Debug.LogWarning($"MapManager: Generator '{newGenerator.name}' is already registered.");
+        }
+    }
+
+    public void UnregisterGenerator(Generator generator)
+    {
+        if (mapGenerators.Remove(generator))
+        {
+            var nodeEntry = nodeToGeneratorMap.FirstOrDefault(kvp => kvp.Value == generator);
+            if (nodeEntry.Key != null)
+            {
+                nodeToGeneratorMap.Remove(nodeEntry.Key);
+            }
+            Debug.Log($"MapManager: Generator '{generator.name}' unregistered. Total generators: {mapGenerators.Count}");
+        }
+    }
+
 }

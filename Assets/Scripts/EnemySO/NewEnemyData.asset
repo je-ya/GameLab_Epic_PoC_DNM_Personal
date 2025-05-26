@@ -9,16 +9,13 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f01094ec6a20b524881787abba9f97c6, type: 3}
-  m_Name: NewMonData
+  m_Script: {fileID: 11500000, guid: 9630b87801ec16d438cf6b97384b1bb5, type: 3}
+  m_Name: NewEnemyData
   m_EditorClassIdentifier: 
-  monName: 
-  monType: 1
-  maxHp: 20
-  attackPower: 5
-  attackRange: 1
-  attackCooldown: 1
-  workEfficiency: 0.1
-  workInterval: 1
-  specialAbilityType: 
-  abilityValue: 0
+  MaxHP: 100
+  MoveSpeed: 5
+  AttackRange: 2
+  AttackCooldown: 3
+  AttackPower: 2
+  FrontDetectionRange: 10
+  RearDetectionRange: 2

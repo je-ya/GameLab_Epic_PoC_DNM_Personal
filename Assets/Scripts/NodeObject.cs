@@ -1,10 +1,9 @@
-﻿// NodeObject.cs
-using UnityEngine;
+﻿using UnityEngine;
 using System.Collections.Generic;
 
 public class NodeObject : MonoBehaviour
 {
-    public enum NodeType { Room, Hallway, Elevator }
+    public enum NodeType { Room, Hallway, Elevator, SpawnRoom }
     public string NodeName; 
     public int Floor;
     public NodeType Type;

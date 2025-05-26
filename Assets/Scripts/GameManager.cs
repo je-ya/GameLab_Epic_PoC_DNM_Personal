@@ -40,11 +40,7 @@ public class GameManager : MonoBehaviour
     [Header("Energy & Victory")]
     public float currentTotalEnergy = 0f;
     public float victoryEnergyGoal = 200f;
-    private List<Generator> mapGenerators = new List<Generator>();
-    public List<Generator> GetGenerators()
-    {
-        return mapGenerators;
-    }
+
 
     // --- UI 참조 ---
     [Header("UI Elements")]
@@ -52,6 +48,8 @@ public class GameManager : MonoBehaviour
     public GameObject setupPanelUI; // 소환수 설정 단계 UI
     public GameObject victoryPanelUI;
     public GameObject defeatPanelUI;
+
+    
 
     void Awake()
     {
@@ -66,8 +64,7 @@ public class GameManager : MonoBehaviour
             return;
         }
 
-        // mapGenerators 리스트 초기화 (중복 방지 및 명확한 시작)
-        mapGenerators = new List<Generator>();
+
 
         if (monParentTransform == null)
         {
@@ -102,18 +99,6 @@ public class GameManager : MonoBehaviour
     {
         ChangeGameState(GameState.Setup);
 
-        // 씬에 미리 배치된 Generator들을 먼저 찾아서 등록 (선택 사항)
-        // 만약 모든 Generator가 GeneratorSpawner를 통해서만 생성된다면 이 부분은 생략 가능
-        Generator[] preExistingGenerators = FindObjectsByType<Generator>(FindObjectsSortMode.None);
-        foreach (Generator gen in preExistingGenerators)
-        {
-            if (!mapGenerators.Contains(gen)) // 중복 등록 방지
-            {
-                mapGenerators.Add(gen);
-                Debug.Log($"Pre-existing generator '{gen.name}' registered.");
-            }
-        }
-
         DragScrpit = gameObject.GetComponent<DragSelection>();
         actionPanelScript = gameObject.GetComponent<ActionPanelController>();
 
@@ -133,13 +118,8 @@ public class GameManager : MonoBehaviour
         switch (newState)
         {
             case GameState.Setup:
-                // Time.timeScale = 0f; // 설정 중에는 게임을 멈출 수 있음 (선택)
-                // UI에서 소환수 개수 입력을 받는 로직 활성화
-                // 이 예제에서는 StartGameWithConfiguredSummons()를 외부(예: UI 버튼)에서 호출한다고 가정
                 break;
             case GameState.Playing:
-                // Time.timeScale = 1f; // 게임 시간 정상화
-                // 설정된 소환수 스폰 로직은 StartGameWithConfiguredSummons에서 처리
                 break;
             case GameState.Victory:
                 Time.timeScale = 0f; // 게임 멈춤
@@ -185,6 +165,11 @@ public class GameManager : MonoBehaviour
 
         DragScrpit.enabled = true;
         actionPanelScript.enabled = true;
+        
+        EnemySpawner enemySpawner;
+        enemySpawner = GetComponent<EnemySpawner>();
+        enemySpawner.SpawnEnemies();
+
         ChangeGameState(GameState.Playing);
     }
 
@@ -227,19 +212,9 @@ public class GameManager : MonoBehaviour
                 break;
             }
 
-            // TODO: 소환 위치를 좀 더 정교하게 설정 (예: 플레이어 주변, 특정 스폰 포인트들)
-            // 현재는 Mon 오브젝트 위치 근처에 랜덤하게 스폰
-            Vector3 spawnPos = monParentTransform.position + Random.insideUnitSphere * 2f; // 예시 위치
-            spawnPos.y = monParentTransform.position.y; // Y축은 부모와 같게 (지형 고려 필요 시 수정)
-
-            GameObject newSummon = Instantiate(prefab, spawnPos, Quaternion.identity, monParentTransform);
-            // newSummon.tag = "PlayerMon"; // 프리팹에 이미 태그가 설정되어 있다고 가정했으므로 주석 처리.
-            // 만약 프리팹에 없다면 여기서 설정.
+            GameObject newSummon = Instantiate(prefab, Vector3.zero, Quaternion.identity, monParentTransform);
             activeSummons.Add(newSummon);
 
-            // 각 소환수 스크립트에서 죽음 이벤트를 GameManager에 알려야 합니다.
-            // 예시: newSummon.GetComponent<SummonHealth>().OnDeath += HandleSummonDeath;
-            // 또는 소환수 스크립트의 Die() 메서드에서 GameManager.Instance.ReportSummonDeath(this.gameObject); 호출
         }
     }
 
@@ -267,38 +242,15 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    public void RegisterGenerator(Generator newGenerator)
-    {
-        if (newGenerator == null)
-        {
-            Debug.LogWarning("GameManager: Attempted to register a null Generator.");
-            return;
-        }
-
-        if (!mapGenerators.Contains(newGenerator))
-        {
-            mapGenerators.Add(newGenerator);
-            Debug.Log($"GameManager: Generator '{newGenerator.name}' registered successfully. Total generators: {mapGenerators.Count}");
-            UpdateTotalEnergy(); // 새 제너레이터가 등록되었으니 에너지 총합 업데이트
-        }
-        else
-        {
-            Debug.LogWarning($"GameManager: Generator '{newGenerator.name}' is already registered.");
-        }
-    }
-
     private void HandleGeneratorProgressUpdate(Generator updatedGenerator)
     {
-        // 어떤 Generator가 업데이트되었는지 인자로 받지만, 현재는 전체를 다시 계산
-        // 만약 최적화가 필요하다면 updatedGenerator 정보 활용 가능
         UpdateTotalEnergy();
     }
 
     void UpdateTotalEnergy()
     {
         currentTotalEnergy = 0f;
-        // mapGenerators에 null이 포함될 수 있으므로 (예: Generator가 파괴되었지만 Unregister 안 된 경우) null 체크
-        foreach (Generator gen in mapGenerators.Where(g => g != null))
+        foreach (Generator gen in MapManager.Instance.MapGenerators.Where(g => g != null))
         {
             currentTotalEnergy += gen.CurrentProgress;
         }

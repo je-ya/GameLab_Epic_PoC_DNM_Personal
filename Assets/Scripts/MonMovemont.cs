@@ -52,12 +52,7 @@ public class MonMovemont : MonoBehaviour
         floors = new Dictionary<int, List<Node>>(MapManager.Instance.NodesByFloor
             .ToDictionary(kvp => kvp.Key, kvp => new List<Node>(kvp.Value)));
 
-        currentNode = MapManager.Instance.GetNodeByName("Room1_F1") ?? nodes.FirstOrDefault();
-        if (currentNode == null)
-        {
-            Debug.LogError("No nodes available in the map. Check MapManager initialization.");
-            return;
-        }
+        currentNode = MapManager.Instance.GetSpawnRoom();
         transform.position = currentNode.Position;
         velocity = Vector3.zero;
 
@@ -106,7 +101,7 @@ public class MonMovemont : MonoBehaviour
             state = MonMovemontState.Moving;
             this.onMovementComplete = onCompleteCallback;
             SetRandomTargetPosition();
-            Debug.Log($"{gameObject.name} starting move to {targetNodeName}. Callback set: {onMovementComplete != null}");
+            //Debug.Log($"{gameObject.name} starting move to {targetNodeName}. Callback set: {onMovementComplete != null}");
         }
         else
         {

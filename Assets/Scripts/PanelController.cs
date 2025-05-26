@@ -2,6 +2,7 @@
 using UnityEngine.UI;
 using System.Collections.Generic;
 using System.Linq;
+using static MonAction;
 
 public class ActionPanelController : MonoBehaviour
 {
@@ -36,157 +37,149 @@ public class ActionPanelController : MonoBehaviour
         actionPanelObject.SetActive(false);
     }
 
-    //void Start()
-    //{
-        
-    //    dragSelection = gameObject.GetComponent<DragSelection>();
-
-    //    // Button listeners
-    //    moveButton.onClick.AddListener(OnMoveClicked);
-    //    attackButton.onClick.AddListener(OnAttackClicked);
-    //    workButton.onClick.AddListener(OnWorkClicked);
-    //    stealthButton.onClick.AddListener(OnStealthClicked);
-    //}
-
-    //public void ShowPanel(List<GameObject> selectedUnits, Vector3 worldPosition)
-    //{
-    //    if (selectedUnits == null || selectedUnits.Count == 0)
-    //    {
-    //        Debug.LogWarning("ActionPanelController: ShowPanel called with no selected units.");
-    //        return;
-    //    }
-
-    //    currentSelectedUnits = selectedUnits;
-    //    clickWorldPosition = worldPosition;
-    //    clickTargetNode = FindClosestNodeToPosition(clickWorldPosition);
-
-    //    actionPanelObject.transform.position = Input.mousePosition;
-
-    //    bool canStealth = selectedUnits.Any(u => u.GetComponent<EmployeeActions>()?.monData.monType == MonType.Outlook);
-    //    attackButton.gameObject.SetActive(true);
-    //    workButton.gameObject.SetActive(true);
-    //    stealthButton.gameObject.SetActive(canStealth);
-
-    //    actionPanelObject.SetActive(true);
-    //}
-
-    //public void HidePanel()
-    //{
-    //    actionPanelObject.SetActive(false);
-    //    currentSelectedUnits = null;
-    //    dragSelection.ClearObjList();
-    //}
-
-    //void OnMoveClicked()
-    //{
-    //    if (clickTargetNode == null)
-    //    {
-    //        Debug.LogWarning("No target node selected for movement.");
-    //        HidePanel();
-    //        return;
-    //    }
-
-    //    Debug.Log($"Action Panel: Issuing Move command to node {clickTargetNode.Name}");
-    //    foreach (GameObject unit in currentSelectedUnits)
-    //    {
-    //        MonMovemont movement = unit.GetComponent<MonMovemont>();
-    //        EmployeeActions actions = unit.GetComponent<EmployeeActions>();
-    //        if (movement != null && actions != null)
-    //        {
-    //            actions.CancelAction(); // Clear any existing actions
-    //            movement.MoveToNode(clickTargetNode.Name); // Move without setting action
-    //        }
-    //    }
-    //    HidePanel();
-    //}
-
-    //void OnAttackClicked()
-    //{
-    //    if (clickTargetNode == null)
-    //    {
-    //        Debug.LogWarning("No target node selected for attack.");
-    //        HidePanel();
-    //        return;
-    //    }
-
-    //    Debug.Log("Action Panel: Issuing Attack command.");
-    //    foreach (GameObject unit in currentSelectedUnits)
-    //    {
-    //        MonMovemont movement = unit.GetComponent<MonMovemont>();
-    //        EmployeeActions actions = unit.GetComponent<EmployeeActions>();
-    //        if (movement != null && actions != null)
-    //        {
-    //            actions.CancelAction();
-    //            movement.MoveToNode(clickTargetNode.Name, () => actions.SetPendingAction(EmployeeActions.ActionState.Attacking));
-    //        }
-    //    }
-    //    HidePanel();
-    //}
-
-    //void OnWorkClicked()
-    //{
-    //    if (clickTargetNode == null)
-    //    {
-    //        Debug.LogWarning("No target node selected for work.");
-    //        HidePanel();
-    //        return;
-    //    }
-
-    //    Generator targetGenerator = FindGeneratorAtNode(clickTargetNode);
-    //    if (targetGenerator == null)
-    //    {
-    //        Debug.LogWarning("No generator found at target node for work.");
-    //        HidePanel();
-    //        return;
-    //    }
-
-    //    Debug.Log("Action Panel: Issuing Work command.");
-    //    foreach (GameObject unit in currentSelectedUnits)
-    //    {
-    //        MonMovemont movement = unit.GetComponent<MonMovemont>();
-    //        EmployeeActions actions = unit.GetComponent<EmployeeActions>();
-    //        if (movement != null && actions != null)
-    //        {
-    //            actions.CancelAction();
-    //            actions.SetTargetGenerator(targetGenerator);
-    //            movement.MoveToNode(clickTargetNode.Name, () => actions.SetPendingAction(EmployeeActions.ActionState.Working));
-    //        }
-    //    }
-    //    HidePanel();
-    //}
-
-    //void OnStealthClicked()
-    //{
-    //    Debug.Log("Action Panel: Issuing Stealth command.");
-    //    foreach (GameObject unit in currentSelectedUnits)
-    //    {
-    //        EmployeeActions actions = unit.GetComponent<EmployeeActions>();
-    //        if (actions != null && actions.monData.monType == MonType.Outlook)
-    //        {
-    //            actions.CancelAction();
-    //            actions.SetPendingAction(EmployeeActions.ActionState.Stealth);
-    //        }
-    //    }
-    //    HidePanel();
-    //}
-
-
-
-
-    private Generator FindGeneratorAtNode(Node node)
+    void Start()
     {
-        if (node == null) return null;
+        dragSelection = gameObject.GetComponent<DragSelection>();
 
-        Generator[] allGenerators = FindObjectsOfType<Generator>();
-        foreach (Generator gen in allGenerators)
+        // Button listeners
+        moveButton.onClick.AddListener(OnMoveClicked);
+        attackButton.onClick.AddListener(OnAttackClicked);
+        workButton.onClick.AddListener(OnWorkClicked);
+        stealthButton.onClick.AddListener(OnStealthClicked);
+    }
+
+    public void ShowPanel(List<GameObject> selectedUnits, Vector3 worldPosition)
+    {
+        if (selectedUnits == null || selectedUnits.Count == 0)
         {
-            if (Vector3.Distance(gen.transform.position, node.Position) < 0.1f)
+            Debug.LogWarning("ActionPanelController: ShowPanel called with no selected units.");
+            return;
+        }
+
+        currentSelectedUnits = selectedUnits;
+        clickWorldPosition = worldPosition;
+
+        actionPanelObject.transform.position = Input.mousePosition;
+
+        bool canStealth = selectedUnits.Any(u => u.GetComponent<MonAction>()?.monData.monType == MonType.Outlook);
+        attackButton.gameObject.SetActive(true);
+        workButton.gameObject.SetActive(true);
+        stealthButton.gameObject.SetActive(canStealth);
+
+        actionPanelObject.SetActive(true);
+    }
+
+    public void HidePanel()
+    {
+        actionPanelObject.SetActive(false);
+        currentSelectedUnits = null;
+        dragSelection.ClearObjList();
+    }
+
+
+
+    private void MoveToNodeAndAct(string actionName)
+    {
+        if (currentSelectedUnits == null || currentSelectedUnits.Count == 0)
+        {
+            Debug.LogWarning($"No units selected for {actionName} action.");
+            HidePanel();
+            return;
+        }
+
+        // 트리거 콜라이더도 감지하도록 설정
+        Physics.queriesHitTriggers = true;
+
+        // "Node" 레이어만 타겟팅
+        LayerMask nodeLayer = LayerMask.GetMask("Node");
+        Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+        RaycastHit[] hits = Physics.RaycastAll(ray, Mathf.Infinity, nodeLayer);
+        foreach (RaycastHit hit in hits)
+        {
+            NodeObject nodeObject = hit.collider.GetComponent<NodeObject>();
+            if (nodeObject != null)
             {
-                return gen;
+                string targetNodeName = nodeObject.NodeName;
+                Debug.Log($"{actionName} command issued to Node: {targetNodeName}");
+
+                Node targetNode = MapManager.Instance.GetNodeByName(targetNodeName);
+
+                // 선택된 모든 오브젝트에 대해 MoveToNode 호출
+                foreach (GameObject obj in currentSelectedUnits)
+                {
+                    MonMovemont movement = obj.GetComponent<MonMovemont>();
+                    MonAction action = obj.GetComponent<MonAction>();
+
+                    MonAction.ActionState actionState;
+                    switch (actionName)
+                    {
+                        case "Move":
+                            actionState = MonAction.ActionState.None; 
+                            break;
+                        case "Attack":
+                            actionState = MonAction.ActionState.Attacking;
+                            break;
+                        case "Working":
+                            actionState = MonAction.ActionState.Working;
+                            break;
+                        case "Stealth":
+                            actionState = MonAction.ActionState.Stealth;
+                            break;
+                        default:
+                            Debug.LogWarning($"알 수 없는 액션: {actionName}");
+                            HidePanel();
+                            return;
+                    }
+
+                    
+                    if (movement != null)
+                    {
+                        movement.MoveToNode(targetNodeName, () =>
+                        {
+                            action.SetPendingAction(actionState);
+                            action.GetReachNodeData(targetNode);
+                        });
+                    }
+                }
+                break; // 첫 번째 NodeObject를 찾으면 종료
             }
         }
-        return null;
+
+        if (hits.Length == 0)
+        {
+            Debug.Log($"No collider hit in 'Node' layer for {actionName} command.");
+        }
+        else if (hits.All(hit => hit.collider.GetComponent<NodeObject>() == null))
+        {
+            Debug.Log($"No NodeObject found in 'Node' layer for {actionName} command.");
+        }
+
+        // 트리거 감지 설정 원복
+        Physics.queriesHitTriggers = false;
+
+        HidePanel();
     }
+
+    void OnMoveClicked()
+    {
+        MoveToNodeAndAct("Move");
+    }
+
+    void OnAttackClicked()
+    {
+        MoveToNodeAndAct("Attack");
+    }
+
+    void OnWorkClicked()
+    {
+        MoveToNodeAndAct("Working");
+    }
+
+    void OnStealthClicked()
+    {
+        MoveToNodeAndAct("Stealth");
+    }
+
 
     void Update()
     {

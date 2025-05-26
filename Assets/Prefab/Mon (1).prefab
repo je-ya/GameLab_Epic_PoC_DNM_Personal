@@ -13,6 +13,8 @@ GameObject:
   - component: {fileID: 1917480746747321575}
   - component: {fileID: 5098005848280124443}
   - component: {fileID: 3771440700169029389}
+  - component: {fileID: 3650425731580289202}
+  - component: {fileID: 867714900207853948}
   m_Layer: 0
   m_Name: Mon (1)
   m_TagString: PlayerMon
@@ -118,13 +120,15 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 7378858182328160796}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 36d1eadef4235d244921ea7ea81e97c6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   _monData: {fileID: 11400000, guid: 3cce9d3d07d95c3489b4a328415a462f, type: 2}
   targetGenerator: {fileID: 0}
+  pDamagerPrefab: {fileID: 6609132263924171399, guid: 24d0564fdcc821344b36afa093a0bcfe, type: 3}
+  poolSize: 10
 --- !u!114 &3771440700169029389
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -146,3 +150,49 @@ MonoBehaviour:
   nodeWeight: 3
   smoothingFactor: 0.1
   targetRadius: 1.5
+--- !u!54 &3650425731580289202
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7378858182328160796}
+  serializedVersion: 4
+  m_Mass: 1
+  m_Drag: 0
+  m_AngularDrag: 0.05
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 0
+  m_IsKinematic: 0
+  m_Interpolate: 0
+  m_Constraints: 124
+  m_CollisionDetection: 0
+--- !u!114 &867714900207853948
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7378858182328160796}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b607ea71fbb2379479e29889b65d605a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  fogMaterial: {fileID: 2100000, guid: 9ef6eea88625f0b41a410961ff3b4bd4, type: 2}
+  unit: {fileID: 3514640507021244632}
+  sightRadius: 0.1
+  mapWidth: 95
+  mapHeight: 60
+  mapOrigin: {x: -45, y: -35}
+  fogAlpha: 0.3

@@ -19,5 +19,6 @@ MonoBehaviour:
   attackRange: 1
   attackCooldown: 1
   workEfficiency: 1
+  workInterval: 1
   specialAbilityType: 
   abilityValue: 0

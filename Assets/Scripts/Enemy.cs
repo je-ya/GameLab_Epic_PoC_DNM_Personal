@@ -1,323 +1,492 @@
 ﻿using UnityEngine;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-
+using System.Collections;
+using UnityEngine.UI;
 public class Enemy : MonoBehaviour
 {
-    [SerializeField] private float _health = 100f;
-    public float health => _health;
-    [SerializeField] private float attackPower = 10f;
-    [SerializeField] private float moveSpeed = 3f;
-    [SerializeField] private float attackRange = 2f;
-    [SerializeField] private float attackCooldown = 1f;
+    public enum PatrolType { FixedRoute, RandomRoom }
+    private enum MovementState { Moving, InElevator, Chasing, Attacking }
 
-    private List<Generator> generators;
-    private int currentGeneratorIndex = 0;
-    private NodeObject currentNode;
-    private NodeObject targetNode;
-    private List<NodeObject> path;
-    private int currentPathIndex;
-    private GameObject attackTarget;
-    private float lastAttackTime;
-    private bool isAttacking;
+    [SerializeField] private EnemyData stats; // 적 스탯 (ScriptableObject)
+    [SerializeField] private PatrolType patrolType; // 패트롤 유형
+    [SerializeField] private List<NodeObject> fixedPatrolRoute; // 고정 루트 노드 리스트 (Inspector에서 설정)
+    [SerializeField] private float elevatorTransitionTime = 2f; // 엘리베이터 이동 시간 (초)
+    [SerializeField] private GameObject damagerPrefab; // Damager 프리팹 (Inspector에서 설정)
+    [SerializeField] private int damagerPoolSize = 3; // 각 Enemy별 Damager 오브젝트 풀 크기 (기본값 3)
 
-    void Start()
+    private float currentHP; // 현재 체력
+    private Node currentNode; // 현재 노드
+    private Node targetNode; // 목표 노드
+    private List<Node> currentPath; // 현재 경로
+    private int currentPathIndex; // 경로 인덱스
+    private List<Node> patrolRoute; // 패트롤 루트
+    private int currentPatrolIndex; // 패트롤 인덱스
+    private float moveTimer; // 이동 타이머
+    private MovementState state = MovementState.Moving; // 현재 상태
+    private GameObject targetPlayer; // 타겟 플레이어
+    private float lastAttackTime; // 마지막 공격 시간
+    private Node lastKnownPlayerNode; // 플레이어의 마지막 노드 위치
+    private List<GameObject> damagerPool; // 각 Enemy의 Damager 오브젝트 풀
+    private int currentPoolIndex; // 풀에서 사용할 다음 인덱스
+
+    [SerializeField] private GameObject hpBarPrefab; // HP 바 프리팹
+    private GameObject hpBarInstance;
+    private Image hpFillImage;
+
+
+    private void Awake()
     {
-        StartCoroutine(InitializeEnemy());
+        if (stats == null)
+        {
+            Debug.LogError($"{gameObject.name}: EnemyStatsSO가 할당되지 않았습니다.");
+            return;
+        }
+        if (damagerPrefab == null)
+        {
+            Debug.LogError($"{gameObject.name}: Damager 프리팹이 할당되지 않았습니다.");
+            return;
+        }
+        currentHP = stats.MaxHP;
+        InitializeDamagerPool();
+        InitializePatrol();
     }
 
-    private IEnumerator InitializeEnemy()
+    private void Start()
     {
-        // GameManager가 초기화될 때까지 대기
-        while (GameManager.Instance == null)
+        if (MapManager.Instance == null)
         {
-            Debug.LogWarning("GameManager not yet initialized, retrying...");
-            yield return new WaitForSeconds(0.1f);
+            Debug.LogError($"{gameObject.name}: MapManager.Instance가 null입니다. 씬에 MapManager가 있는지 확인하세요.");
+            return;
         }
 
-        // 발전기 목록이 채워질 때까지 대기
-        int retryCount = 0;
-        const int maxRetries = 50; // 최대 5초 대기 (0.1초 * 50)
-        while (retryCount < maxRetries)
+        // 초기 노드 설정
+        NodeObject closestNodeObj = FindObjectsByType<NodeObject>(FindObjectsSortMode.None)
+            .OrderBy(n => Vector3.Distance(transform.position, n.transform.position)).FirstOrDefault();
+        if (closestNodeObj != null)
         {
-            generators = GameManager.Instance.GetGenerators();
-            if (generators != null && generators.Count > 0)
+            currentNode = MapManager.Instance.GetNodeByName(closestNodeObj.NodeName);
+            if (currentNode == null)
             {
-                Debug.Log($"Found {generators.Count} generators in GameManager.");
-                break;
+                Debug.LogError($"{gameObject.name}: 초기 노드({closestNodeObj.NodeName})를 MapManager에서 찾을 수 없습니다.");
+                return;
             }
-            Debug.LogWarning($"No generators found in GameManager, retrying... (Attempt {retryCount + 1}/{maxRetries})");
-            retryCount++;
-            yield return new WaitForSeconds(0.1f);
-        }
-
-        if (generators == null || generators.Count == 0)
-        {
-            Debug.LogError("No generators found in GameManager after retries!");
-            yield break;
-        }
-
-        // 초기 위치에서 가장 가까운 NodeObject 찾기
-        currentNode = FindClosestNode();
-        if (currentNode == null)
-        {
-            Debug.LogError("No initial node found for enemy!");
-            yield break;
-        }
-
-        // 첫 번째 발전기로 경로 설정
-        SetPathToGenerator();
-    }
-
-    // 나머지 메서드는 동일
-    void Update()
-    {
-        if (generators == null || generators.Count == 0 || currentNode == null) return;
-
-        if (!isAttacking)
-        {
-            GameObject player = DetectPlayerMon();
-            if (player != null)
-            {
-                attackTarget = player;
-                isAttacking = true;
-                path = null;
-            }
-            else
-            {
-                MoveToTarget();
-            }
+            SetNewTargetNode();
         }
         else
         {
-            HandleAttackState();
+            Debug.LogError($"{gameObject.name}: 씬에서 NodeObject를 찾을 수 없습니다.");
+        }
+
+        if (hpBarPrefab != null)
+        {
+
+            hpBarInstance = hpBarPrefab;
+            hpFillImage = hpBarInstance.GetComponent<Image>();
+        }
+        else
+        {
+            Debug.LogWarning($"{gameObject.name}: HP 바 프리팹이 할당되지 않았습니다.");
+        }
+
+    }
+
+    private void InitializeDamagerPool()
+    {
+        damagerPool = new List<GameObject>();
+        currentPoolIndex = 0;
+
+        // 각 Enemy별 Damager 오브젝트 풀 생성
+        for (int i = 0; i < damagerPoolSize; i++)
+        {
+            GameObject damager = Instantiate(damagerPrefab, Vector3.zero, Quaternion.identity);
+            damager.SetActive(false);
+            damager.transform.SetParent(transform); // Enemy의 자식으로 설정하여 관리 용이
+            damagerPool.Add(damager);
         }
     }
 
-    private NodeObject FindClosestNode()
+    private void InitializePatrol()
     {
-        NodeObject[] allNodes = FindObjectsOfType<NodeObject>();
-        NodeObject closest = null;
-        float minDistance = Mathf.Infinity;
-        Vector3 position = transform.position;
-
-        foreach (NodeObject node in allNodes)
+        if (MapManager.Instance == null)
         {
-            float distance = Vector3.Distance(position, node.transform.position);
-            if (distance < minDistance)
-            {
-                minDistance = distance;
-                closest = node;
-            }
-        }
-        return closest;
-    }
-
-    private GameObject DetectPlayerMon()
-    {
-        Collider[] colliders = Physics.OverlapSphere(currentNode.transform.position, attackRange);
-        foreach (Collider col in colliders)
-        {
-            if (col.CompareTag("PlayerMon"))
-            {
-                return col.gameObject;
-            }
-        }
-        return null;
-    }
-
-    private void HandleAttackState()
-    {
-        if (attackTarget == null)
-        {
-            isAttacking = false;
-            SetPathToGenerator();
+            Debug.LogError($"{gameObject.name}: MapManager.Instance가 null입니다. InitializePatrol 실패.");
+            patrolType = PatrolType.RandomRoom;
             return;
         }
 
-        NodeObject playerNode = FindClosestNodeTo(attackTarget.transform.position);
-        int distance = CalculateNodeDistance(currentNode, playerNode);
-
-        if (distance > 2)
+        if (patrolType == PatrolType.FixedRoute)
         {
-            isAttacking = false;
-            attackTarget = null;
-            SetPathToGenerator();
-            return;
-        }
+            patrolRoute = new List<Node>();
 
-        float distanceToTarget = Vector3.Distance(transform.position, attackTarget.transform.position);
-        if (distanceToTarget <= attackRange && Time.time >= lastAttackTime + attackCooldown)
-        {
-            Attack(attackTarget);
-            lastAttackTime = Time.time;
-        }
-        else if (distanceToTarget > attackRange)
-        {
-            path = FindPath(currentNode, playerNode);
-            currentPathIndex = 0;
-            MoveToTarget();
-        }
-    }
-
-    private void Attack(GameObject target)
-    {
-        MonAction player = target.GetComponent<MonAction>();
-        if (player != null)
-        {
-            player.TakeDamage(attackPower);
-            Debug.Log($"Enemy attacked {target.name}, dealt {attackPower} damage");
-        }
-    }
-
-    private void SetPathToGenerator()
-    {
-        if (generators == null || generators.Count == 0)
-        {
-            Debug.LogWarning("No generators available to set path!");
-            return;
-        }
-
-        // Cycle back to the first generator if the end is reached
-        if (currentGeneratorIndex >= generators.Count)
-        {
-            currentGeneratorIndex = 0;
-            Debug.Log("Cycling back to first generator!");
-        }
-
-        NodeObject generatorNode = FindClosestNodeTo(generators[currentGeneratorIndex].transform.position);
-        path = FindPath(currentNode, generatorNode);
-        currentPathIndex = 0;
-        targetNode = path != null && path.Count > 0 ? path[0] : null;
-    }
-
-    private void MoveToTarget()
-    {
-        if (path == null || currentPathIndex >= path.Count)
-        {
-            if (currentGeneratorIndex < generators.Count &&
-                Vector3.Distance(transform.position, generators[currentGeneratorIndex].transform.position) < 0.1f)
+            // Generator가 있는 노드들을 가져옴
+            var generatorNodes = MapManager.Instance.GetNodesWithGenerators().ToList();
+            if (generatorNodes == null || generatorNodes.Count == 0)
             {
-                currentGeneratorIndex++;
-                SetPathToGenerator();
+                Debug.LogWarning($"{gameObject.name}: Generator가 있는 노드가 없습니다. 랜덤 룸 패트롤로 전환합니다.");
+                patrolType = PatrolType.RandomRoom;
+                return;
             }
-            return;
-        }
 
-        targetNode = path[currentPathIndex];
-        Vector3 targetPosition = targetNode.transform.position;
-        transform.position = Vector3.MoveTowards(transform.position, targetPosition, moveSpeed * Time.deltaTime);
-
-        if (Vector3.Distance(transform.position, targetPosition) < 0.1f)
-        {
-            currentNode = targetNode;
-            currentPathIndex++;
-            if (currentPathIndex < path.Count)
+            // fixedPatrolRoute가 Inspector에서 설정된 경우, 이를 우선적으로 사용
+            if (fixedPatrolRoute != null && fixedPatrolRoute.Count > 0)
             {
-                targetNode = path[currentPathIndex];
-            }
-        }
-    }
-
-    private NodeObject FindClosestNodeTo(Vector3 position)
-    {
-        NodeObject[] allNodes = FindObjectsOfType<NodeObject>();
-        NodeObject closest = null;
-        float minDistance = Mathf.Infinity;
-
-        foreach (NodeObject node in allNodes)
-        {
-            float distance = Vector3.Distance(position, node.transform.position);
-            if (distance < minDistance)
-            {
-                minDistance = distance;
-                closest = node;
-            }
-        }
-        return closest;
-    }
-
-    private int CalculateNodeDistance(NodeObject start, NodeObject end)
-    {
-        if (start == null || end == null) return int.MaxValue;
-
-        Queue<NodeObject> queue = new Queue<NodeObject>();
-        Dictionary<NodeObject, int> distances = new Dictionary<NodeObject, int>();
-        queue.Enqueue(start);
-        distances[start] = 0;
-
-        while (queue.Count > 0)
-        {
-            NodeObject current = queue.Dequeue();
-            if (current == end) return distances[current];
-
-            foreach (NodeObject neighbor in current.Neighbors)
-            {
-                if (!distances.ContainsKey(neighbor))
+                fixedPatrolRoute.RemoveAll(n => n == null);
+                if (fixedPatrolRoute.Count > 0)
                 {
-                    distances[neighbor] = distances[current] + 1;
-                    queue.Enqueue(neighbor);
+                    foreach (var nodeObj in fixedPatrolRoute)
+                    {
+                        if (nodeObj == null) continue;
+                        Node node = MapManager.Instance.GetNodeByName(nodeObj.NodeName);
+                        if (node != null)
+                        {
+                            patrolRoute.Add(node);
+                        }
+                        else
+                        {
+                            Debug.LogWarning($"{gameObject.name}: {nodeObj.NodeName}에 해당하는 노드를 MapManager에서 찾을 수 없습니다.");
+                        }
+                    }
                 }
             }
-        }
-        return int.MaxValue;
-    }
 
-    private List<NodeObject> FindPath(NodeObject start, NodeObject goal)
-    {
-        if (start == null || goal == null) return null;
-
-        List<NodeObject> openSet = new List<NodeObject> { start };
-        Dictionary<NodeObject, NodeObject> cameFrom = new Dictionary<NodeObject, NodeObject>();
-        Dictionary<NodeObject, float> gScore = new Dictionary<NodeObject, float> { { start, 0 } };
-        Dictionary<NodeObject, float> fScore = new Dictionary<NodeObject, float> { { start, Vector3.Distance(start.transform.position, goal.transform.position) } };
-
-        while (openSet.Count > 0)
-        {
-            NodeObject current = openSet.OrderBy(n => fScore.GetValueOrDefault(n, float.MaxValue)).First();
-            if (current == goal)
+            // fixedPatrolRoute가 비어있거나 설정되지 않은 경우, Generator 노드를 사용
+            if (patrolRoute.Count == 0)
             {
-                return ReconstructPath(cameFrom, current);
+                patrolRoute = generatorNodes;
             }
 
-            openSet.Remove(current);
-            foreach (NodeObject neighbor in current.Neighbors)
+            if (patrolRoute.Count == 0)
             {
-                float tentativeGScore = gScore[current] + Vector3.Distance(current.transform.position, neighbor.transform.position);
-                if (tentativeGScore < gScore.GetValueOrDefault(neighbor, float.MaxValue))
+                Debug.LogWarning($"{gameObject.name}: 유효한 패트롤 노드가 없습니다. 랜덤 룸 패트롤로 전환합니다.");
+                patrolType = PatrolType.RandomRoom;
+            }
+        }
+    }
+
+    private void Update()
+    {
+        if (state == MovementState.InElevator) return;
+
+        // 플레이어 감지
+        DetectPlayer();
+
+        // 상태에 따른 행동
+        if (state == MovementState.Chasing)
+        {
+            ChasePlayer();
+        }
+        else if (state == MovementState.Attacking)
+        {
+            AttackPlayer();
+        }
+        else if (state == MovementState.Moving)
+        {
+            if (currentNode == null || targetNode == null || currentPath == null) return;
+            MoveAlongPath();
+        }
+    }
+
+    private void DetectPlayer()
+    {
+        GameObject player = GameObject.FindGameObjectWithTag("PlayerMon");
+        if (player == null) return;
+
+        Vector3 toPlayer = player.transform.position - transform.position;
+        float distanceToPlayer = toPlayer.magnitude;
+
+        // X축 기준 앞/뒤 감지 범위 확인
+        bool isInFront = toPlayer.x > 0 && Mathf.Abs(toPlayer.x) <= stats.FrontDetectionRange && Mathf.Abs(toPlayer.y) < 1f;
+        bool isInRear = toPlayer.x < 0 && Mathf.Abs(toPlayer.x) <= stats.RearDetectionRange && Mathf.Abs(toPlayer.y) < 1f;
+
+        if (isInFront || isInRear)
+        {
+            // 플레이어의 현재 노드 확인
+            NodeObject playerNodeObj = FindObjectsByType<NodeObject>(FindObjectsSortMode.None)
+                .OrderBy(n => Vector3.Distance(player.transform.position, n.transform.position)).FirstOrDefault();
+            if (playerNodeObj != null)
+            {
+                Node playerNode = MapManager.Instance.GetNodeByName(playerNodeObj.NodeName);
+                if (playerNode != null)
                 {
-                    cameFrom[neighbor] = current;
-                    gScore[neighbor] = tentativeGScore;
-                    fScore[neighbor] = gScore[neighbor] + Vector3.Distance(neighbor.transform.position, goal.transform.position);
-                    if (!openSet.Contains(neighbor))
+                    // 타겟 설정
+                    if (targetPlayer == null)
                     {
-                        openSet.Add(neighbor);
+                        targetPlayer = player;
+                        lastKnownPlayerNode = playerNode;
+                        state = MovementState.Chasing;
+                        Debug.Log($"{gameObject.name}: 플레이어 감지, 추적 시작");
+                    }
+                    else
+                    {
+                        // 타겟이 2노드 이상 멀어졌는지 확인
+                        List<Node> pathToPlayer = AStarPathfinding.FindPath(currentNode, playerNode);
+                        if (pathToPlayer == null || pathToPlayer.Count > 2)
+                        {
+                            ClearTarget();
+                        }
+                        else
+                        {
+                            lastKnownPlayerNode = playerNode;
+                        }
                     }
                 }
             }
         }
-        return null;
+        else if (targetPlayer != null)
+        {
+            // 감지 범위 밖이면 타겟 해제
+            ClearTarget();
+        }
     }
 
-    private List<NodeObject> ReconstructPath(Dictionary<NodeObject, NodeObject> cameFrom, NodeObject current)
+    private void ChasePlayer()
     {
-        List<NodeObject> path = new List<NodeObject> { current };
-        while (cameFrom.ContainsKey(current))
+        if (targetPlayer == null)
         {
-            current = cameFrom[current];
-            path.Insert(0, current);
+            ClearTarget();
+            return;
         }
-        return path;
+
+        // 플레이어의 현재 노드 가져오기
+        NodeObject playerNodeObj = FindObjectsByType<NodeObject>(FindObjectsSortMode.None)
+            .OrderBy(n => Vector3.Distance(targetPlayer.transform.position, n.transform.position)).FirstOrDefault();
+        if (playerNodeObj == null)
+        {
+            ClearTarget();
+            return;
+        }
+
+        Node playerNode = MapManager.Instance.GetNodeByName(playerNodeObj.NodeName);
+        if (playerNode == null)
+        {
+            ClearTarget();
+            return;
+        }
+
+        // 플레이어와 2노드 이상 멀어졌는지 확인
+        List<Node> pathToPlayer = AStarPathfinding.FindPath(currentNode, playerNode);
+        if (pathToPlayer == null || pathToPlayer.Count > 2)
+        {
+            ClearTarget();
+            return;
+        }
+
+        // 공격 범위 내인지 확인
+        float distanceToPlayer = Vector3.Distance(transform.position, targetPlayer.transform.position);
+        if (distanceToPlayer <= stats.AttackRange)
+        {
+            state = MovementState.Attacking;
+            return;
+        }
+
+        // 경로 갱신
+        if (playerNode != targetNode)
+        {
+            targetNode = playerNode;
+            currentPath = pathToPlayer;
+            currentPathIndex = 0;
+        }
+
+        // 1.5배 속도로 이동
+        if (currentPath != null && currentPathIndex < currentPath.Count)
+        {
+            Node nextNode = currentPath[currentPathIndex];
+            if (currentNode.Type == NodeObject.NodeType.Elevator && nextNode.Type == NodeObject.NodeType.Elevator)
+            {
+                StartElevatorTransition(nextNode);
+                return;
+            }
+
+            Vector3 targetPosition = nextNode.Position;
+            transform.position = Vector3.MoveTowards(transform.position, targetPosition, stats.MoveSpeed * 1.5f * Time.deltaTime);
+
+            if (Vector3.Distance(transform.position, targetPosition) < 0.1f)
+            {
+                currentNode = nextNode;
+                currentPathIndex++;
+
+                if (currentPathIndex >= currentPath.Count)
+                {
+                    currentPath = AStarPathfinding.FindPath(currentNode, targetNode);
+                    currentPathIndex = 0;
+                }
+            }
+        }
+    }
+
+    private void AttackPlayer()
+    {
+        if (targetPlayer == null)
+        {
+            ClearTarget();
+            return;
+        }
+
+        float distanceToPlayer = Vector3.Distance(transform.position, targetPlayer.transform.position);
+        if (distanceToPlayer > stats.AttackRange)
+        {
+            state = MovementState.Chasing;
+            return;
+        }
+
+        // 공격 쿨타임 확인
+        if (Time.time >= lastAttackTime + stats.AttackCooldown)
+        {
+            // 오브젝트 풀에서 Damager 활성화
+            GameObject damager = GetPooledDamager();
+            if (damager != null)
+            {
+                Vector3 direction = (targetPlayer.transform.position - transform.position).normalized;
+                Vector3 spawnPosition = transform.position + direction * 0.5f;
+                damager.transform.position = spawnPosition;
+                damager.SetActive(true);
+                lastAttackTime = Time.time;
+                //Debug.Log($"{gameObject.name}: Damager 활성화 at {spawnPosition}");
+            }
+            else
+            {
+                Debug.LogWarning($"{gameObject.name}: 사용 가능한 Damager 오브젝트가 풀에 없습니다.");
+            }
+        }
+    }
+
+    private GameObject GetPooledDamager()
+    {
+        // 풀에서 비활성화된 Damager 찾기
+        for (int i = 0; i < damagerPoolSize; i++)
+        {
+            GameObject damager = damagerPool[currentPoolIndex];
+            currentPoolIndex = (currentPoolIndex + 1) % damagerPoolSize;
+            if (!damager.activeInHierarchy)
+            {
+                return damager;
+            }
+        }
+        return null; // 사용 가능한 Damager 없음
+    }
+
+    private void ClearTarget()
+    {
+        targetPlayer = null;
+        lastKnownPlayerNode = null;
+        state = MovementState.Moving;
+        SetNewTargetNode();
+        Debug.Log($"{gameObject.name}: 타겟 해제, 패트롤로 복귀");
+    }
+
+    private void SetNewTargetNode()
+    {
+        if (MapManager.Instance == null)
+        {
+            Debug.LogError($"{gameObject.name}: MapManager.Instance가 null입니다. SetNewTargetNode 실패.");
+            return;
+        }
+
+        if (patrolType == PatrolType.FixedRoute)
+        {
+            if (patrolRoute == null || patrolRoute.Count == 0)
+            {
+                Debug.LogWarning($"{gameObject.name}: patrolRoute가 비어 있습니다. 랜덤 룸 패트롤로 전환합니다.");
+                patrolType = PatrolType.RandomRoom;
+                SetNewTargetNode();
+                return;
+            }
+            currentPatrolIndex = (currentPatrolIndex + 1) % patrolRoute.Count;
+            targetNode = patrolRoute[currentPatrolIndex];
+        }
+        else // RandomRoom
+        {
+            var roomNodes = MapManager.Instance.AllNodes
+                .Where(n => n.Type == NodeObject.NodeType.Room && n != currentNode)
+                .ToList();
+            if (roomNodes == null || roomNodes.Count == 0)
+            {
+                Debug.LogWarning($"{gameObject.name}: 유효한 Room 노드가 없습니다.");
+                return;
+            }
+            targetNode = roomNodes[Random.Range(0, roomNodes.Count)];
+        }
+
+        if (targetNode != null)
+        {
+            currentPath = AStarPathfinding.FindPath(currentNode, targetNode);
+            if (currentPath == null)
+            {
+                Debug.LogWarning($"{gameObject.name}: {currentNode.NodeName}에서 {targetNode.NodeName}으로의 경로를 찾을 수 없습니다.");
+                return;
+            }
+            currentPathIndex = 0;
+        }
+    }
+
+    private void MoveAlongPath()
+    {
+        if (currentPath == null || currentPathIndex >= currentPath.Count) return;
+
+        Node nextNode = currentPath[currentPathIndex];
+        if (currentNode.Type == NodeObject.NodeType.Elevator && nextNode.Type == NodeObject.NodeType.Elevator)
+        {
+            StartElevatorTransition(nextNode);
+            return;
+        }
+
+        Vector3 targetPosition = nextNode.Position;
+        transform.position = Vector3.MoveTowards(transform.position, targetPosition, stats.MoveSpeed * Time.deltaTime);
+
+        if (Vector3.Distance(transform.position, targetPosition) < 0.1f)
+        {
+            currentNode = nextNode;
+            currentPathIndex++;
+
+            if (currentPathIndex >= currentPath.Count)
+            {
+                SetNewTargetNode();
+            }
+        }
+    }
+
+    private void StartElevatorTransition(Node elevatorNode)
+    {
+        state = MovementState.InElevator;
+        StartCoroutine(ElevatorTransition(elevatorNode));
+    }
+
+    private IEnumerator ElevatorTransition(Node targetElevator)
+    {
+        //Debug.Log($"{gameObject.name}: {currentNode.Floor}층에서 엘리베이터 탑승");
+        yield return new WaitForSeconds(elevatorTransitionTime);
+        transform.position = targetElevator.Position;
+        currentNode = targetElevator;
+        currentPathIndex++;
+        if (currentPathIndex >= currentPath.Count)
+        {
+            if (state == MovementState.Chasing)
+            {
+                ChasePlayer();
+            }
+            else
+            {
+                SetNewTargetNode();
+            }
+        }
+        state = MovementState.Moving;
+        //Debug.Log($"{gameObject.name}: {targetElevator.Floor}층에 도착");
     }
 
     public void TakeDamage(float damage)
     {
-        _health -= damage;
-        if (_health <= 0)
+        currentHP -= damage;
+
+        // HP 바 업데이트
+        if (hpFillImage != null)
+        {
+            hpFillImage.fillAmount = currentHP / stats.MaxHP;
+        }
+
+        if (currentHP <= 0)
         {
             Destroy(gameObject);
-            Debug.Log("Enemy destroyed!");
         }
     }
 }

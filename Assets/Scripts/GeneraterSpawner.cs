@@ -40,33 +40,41 @@ public class GeneratorSpawner : MonoBehaviour
 
         List<NodeObject> selectedNodes = roomNodes.OrderBy(x => Random.value).Take(numberOfGenerators).ToList();
 
-        foreach (NodeObject node in selectedNodes)
+        foreach (NodeObject nodeObj in selectedNodes)
         {
-            GameObject generatorObj = Instantiate(generatorPrefab, node.transform.position, Quaternion.identity);
-            generatorObj.name = $"Generator_{node.NodeName}";
+            GameObject generatorObj = Instantiate(generatorPrefab, nodeObj.transform.position, Quaternion.identity);
+            generatorObj.name = $"Generator_{nodeObj.NodeName}";
             Generator generator = generatorObj.GetComponent<Generator>();
 
             if (generator == null)
             {
-                Debug.LogError($"Generator component not found on instantiated prefab at {node.NodeName}");
+                Debug.LogError($"Generator component not found on instantiated prefab at {nodeObj.NodeName}");
                 Destroy(generatorObj);
                 continue;
             }
 
-            spawnedGenerators.Add(generator); 
+            spawnedGenerators.Add(generator);
 
-            // --- 생성된 Generator를 GameManager에 등록 ---
-            if (GameManager.Instance != null)
+            // --- 생성된 Generator를 MapManager에 등록 ---
+            if (MapManager.Instance != null)
             {
-                GameManager.Instance.RegisterGenerator(generator);
+                Node node = MapManager.Instance.GetNodeByName(nodeObj.NodeName);
+                if (node != null)
+                {
+                    MapManager.Instance.RegisterGenerator(generator, node);
+                }
+                else
+                {
+                    Debug.LogError($"GeneratorSpawner: Node '{nodeObj.NodeName}' not found in MapManager for generator '{generator.name}'.");
+                }
             }
             else
             {
-                Debug.LogError($"GeneratorSpawner: GameManager.Instance is null. Cannot register generator '{generator.name}'. Make sure GameManager exists and is initialized.");
+                Debug.LogError($"GeneratorSpawner: MapManager.Instance is null. Cannot register generator '{generator.name}'.");
             }
             // ---------------------------------------------
 
-            Debug.Log($"Spawned generator at {node.NodeName} (Position: {node.transform.position})");
+            Debug.Log($"Spawned generator at {nodeObj.NodeName} (Position: {nodeObj.transform.position})");
         }
     }
 
